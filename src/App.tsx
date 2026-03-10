@@ -13,6 +13,7 @@ import { FloatingPoints } from './components/FloatingPoints';
 import { AmbientBackground } from './components/AmbientBackground';
 import { NormalGalleryModal } from './components/NormalGalleryModal';
 import { MemeGalleryModal } from './components/MemeGalleryModal';
+import { SiddhantSticker } from './components/SiddhantSticker';
 import { Ghost, Sparkles, ChevronRight, Flame, Target, Moon, Sun, Info, Image as ImageIcon, ImagePlus, ExternalLink, Skull, Bird, Bot, Zap, Star, Cloud, Snowflake, Droplet, Wind, Coffee, Rocket, Crown, Eye, Shield, Key } from 'lucide-react';
 import { audio } from './utils/audio';
 import { io } from 'socket.io-client';
@@ -371,6 +372,8 @@ export default function App() {
         points={floatingPoints} 
         onComplete={handlePointsAnimationComplete} 
       />
+
+      <SiddhantSticker />
     </div>
   );
 }
