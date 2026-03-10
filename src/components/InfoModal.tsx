@@ -52,7 +52,7 @@ export function InfoModal({ isOpen, onClose }: InfoModalProps) {
             </div>
 
             <a
-              href="https://instagram.com"
+              href="https://www.instagram.com/siddhant_hater824?igsh=N2hvcHBrOTFnOWh2&utm_source=qr"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-8 w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white font-semibold hover:opacity-90 transition-opacity shadow-lg"

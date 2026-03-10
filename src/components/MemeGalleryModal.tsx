@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Upload, ImagePlus, Trash2, Heart } from 'lucide-react';
+import { X, Upload, ImagePlus, Trash2, Heart, Loader2 } from 'lucide-react';
+import { io } from 'socket.io-client';
 
 interface MemeGalleryModalProps {
   isOpen: boolean;
@@ -8,115 +9,149 @@ interface MemeGalleryModalProps {
 }
 
 interface Meme {
+  id: number;
   url: string;
   owner: string;
-  likes?: number;
-  likedBy?: string[];
+  likes: number;
+  likedBy: string[];
 }
+
+const socket = io();
 
 export function MemeGalleryModal({ isOpen, onClose }: MemeGalleryModalProps) {
   const [memes, setMemes] = useState<Meme[]>([]);
   const [currentUser, setCurrentUser] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchMemes = async () => {
+    try {
+      const res = await fetch('/api/memes');
+      if (res.ok) {
+        const data = await res.json();
+        setMemes(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch memes', e);
+    }
+  };
 
   useEffect(() => {
     const storedName = localStorage.getItem('siddhant_user_name') || 'Anonymous';
     setCurrentUser(storedName);
 
-    const storedMemes = localStorage.getItem('siddhant_memes');
-    if (storedMemes) {
-      try {
-        const parsed = JSON.parse(storedMemes);
-        // Handle backward compatibility for older string-only memes
-        const formattedMemes = parsed.map((m: any) => {
-          if (typeof m === 'string') {
-            return { url: m, owner: 'Anonymous', likes: 0, likedBy: [] };
-          }
-          return {
-            ...m,
-            likes: m.likes || 0,
-            likedBy: m.likedBy || []
-          };
-        });
-        setMemes(formattedMemes);
-      } catch (e) {
-        console.error('Failed to parse memes', e);
-      }
+    if (isOpen) {
+      fetchMemes();
+      
+      socket.on('memes_update', () => {
+        fetchMemes();
+      });
+
+      return () => {
+        socket.off('memes_update');
+      };
     }
-  }, []);
+  }, [isOpen]);
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Only allow images/gifs
     if (!file.type.startsWith('image/')) {
-      alert('Only images and GIFs are allowed.');
+      console.error('Only images and GIFs are allowed.');
       return;
     }
 
+    setIsLoading(true);
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const base64String = event.target?.result as string;
-      const newMeme: Meme = { url: base64String, owner: currentUser, likes: 0, likedBy: [] };
-      const newMemes = [newMeme, ...memes];
-      setMemes(newMemes);
-      localStorage.setItem('siddhant_memes', JSON.stringify(newMemes));
+      
+      try {
+        const res = await fetch('/api/memes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: base64String, owner: currentUser })
+        });
+        
+        if (res.ok) {
+          fetchMemes();
+        }
+      } catch (e) {
+        console.error('Failed to upload meme', e);
+      } finally {
+        setIsLoading(false);
+      }
     };
     reader.readAsDataURL(file);
     
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const handleLike = (index: number) => {
-    const newMemes = [...memes];
-    const meme = { ...newMemes[index] };
-    const likedBy = meme.likedBy || [];
-    
-    if (likedBy.includes(currentUser)) {
-      meme.likes = Math.max(0, (meme.likes || 0) - 1);
-      meme.likedBy = likedBy.filter(u => u !== currentUser);
-    } else {
-      meme.likes = (meme.likes || 0) + 1;
-      meme.likedBy = [...likedBy, currentUser];
+  const handleLike = async (id: number) => {
+    // Optimistic update
+    setMemes(currentMemes => currentMemes.map(meme => {
+      if (meme.id === id) {
+        const isLiked = meme.likedBy.includes(currentUser);
+        return {
+          ...meme,
+          likes: isLiked ? Math.max(0, meme.likes - 1) : meme.likes + 1,
+          likedBy: isLiked 
+            ? meme.likedBy.filter(u => u !== currentUser)
+            : [...meme.likedBy, currentUser]
+        };
+      }
+      return meme;
+    }));
+
+    try {
+      await fetch(`/api/memes/${id}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser })
+      });
+      // fetchMemes() is handled by socket event
+    } catch (e) {
+      console.error('Failed to like meme', e);
     }
-    
-    newMemes[index] = meme;
-    setMemes(newMemes);
-    localStorage.setItem('siddhant_memes', JSON.stringify(newMemes));
   };
 
-  const handleDelete = (index: number) => {
-    const meme = memes[index];
-    
-    if (meme.owner !== currentUser && !isAdmin) {
-      alert('You can only delete your own memes.');
+  const handleDelete = async (id: number, owner: string) => {
+    if (owner !== currentUser && !isAdmin) {
       return;
     }
 
-    if (confirm('Are you sure you want to delete this meme?')) {
-      const newMemes = memes.filter((_, i) => i !== index);
-      setMemes(newMemes);
-      localStorage.setItem('siddhant_memes', JSON.stringify(newMemes));
+    // Optimistic update
+    setMemes(currentMemes => currentMemes.filter(m => m.id !== id));
+
+    try {
+      await fetch(`/api/memes/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser, isAdmin })
+      });
+      // fetchMemes() is handled by socket event
+    } catch (e) {
+      console.error('Failed to delete meme', e);
     }
   };
 
   const handleAdminUnlock = () => {
     if (!isAdmin) {
-      const pwd = prompt('Developer Admin Password:');
-      if (pwd === '824') {
-        setIsAdmin(true);
-        alert('Admin mode unlocked. You can now delete any meme.');
-      } else if (pwd !== null) {
-        alert('Incorrect password.');
+      try {
+        const pwd = window.prompt('Developer Admin Password:');
+        if (pwd === '824') {
+          setIsAdmin(true);
+        }
+      } catch (e) {
+        console.error('Prompt blocked by iframe');
       }
     }
   };
@@ -164,10 +199,11 @@ export function MemeGalleryModal({ isOpen, onClose }: MemeGalleryModalProps) {
               </p>
               <button
                 onClick={handleUploadClick}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full font-medium transition-colors text-sm shrink-0"
+                disabled={isLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full font-medium transition-colors text-sm shrink-0"
               >
-                <Upload className="w-4 h-4" />
-                Upload Meme
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {isLoading ? 'Uploading...' : 'Upload Meme'}
               </button>
               <input
                 type="file"
@@ -188,19 +224,19 @@ export function MemeGalleryModal({ isOpen, onClose }: MemeGalleryModalProps) {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {memes.map((meme, idx) => (
-                  <div key={idx} className="relative group rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950 flex flex-col">
+                {memes.map((meme) => (
+                  <div key={meme.id} className="relative group rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950 flex flex-col">
                     <div className="relative aspect-square bg-zinc-200 dark:bg-zinc-900">
                       <img 
                         src={meme.url} 
-                        alt={`Meme ${idx + 1}`} 
+                        alt="Meme" 
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
                       />
                       {(meme.owner === currentUser || isAdmin) && (
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
                           <button
-                            onClick={() => handleDelete(idx)}
+                            onClick={() => handleDelete(meme.id, meme.owner)}
                             className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors transform translate-y-4 group-hover:translate-y-0 duration-200 shadow-lg"
                             title={meme.owner === currentUser ? "Delete your meme" : "Delete (Admin)"}
                           >
@@ -214,7 +250,7 @@ export function MemeGalleryModal({ isOpen, onClose }: MemeGalleryModalProps) {
                         By: {meme.owner}
                       </span>
                       <button
-                        onClick={() => handleLike(idx)}
+                        onClick={() => handleLike(meme.id)}
                         className="flex items-center gap-1.5 text-zinc-500 hover:text-rose-500 dark:text-zinc-400 dark:hover:text-rose-400 transition-colors"
                       >
                         <Heart className={`w-4 h-4 transition-all ${meme.likedBy?.includes(currentUser) ? 'fill-rose-500 text-rose-500 dark:fill-rose-400 dark:text-rose-400 scale-110' : 'scale-100'}`} />

@@ -15,14 +15,18 @@ import { NormalGalleryModal } from './components/NormalGalleryModal';
 import { MemeGalleryModal } from './components/MemeGalleryModal';
 import { Ghost, Sparkles, ChevronRight, Flame, Target, Moon, Sun, Info, Image as ImageIcon, ImagePlus, ExternalLink, Skull, Bird, Bot, Zap, Star, Cloud, Snowflake, Droplet, Wind, Coffee, Rocket, Crown, Eye, Shield, Key } from 'lucide-react';
 import { audio } from './utils/audio';
+import { io } from 'socket.io-client';
 
 const ADJECTIVES = ['Based', 'Sigma', 'Chill', 'Secret', 'Hidden', 'Elite', 'Dank', 'Cursed', 'Blessed', 'Rogue', 'Loyal', 'Goofy', 'Chad', 'Mysterious', 'Silent', 'Anon'];
 const NOUNS = ['Investigator', 'Watcher', 'Follower', 'Friend', 'Bro', 'Detective', 'Observer', 'Fan', 'Stan', 'Believer', 'Witness', 'Agent', 'Scholar', 'Poster', 'Lurker', 'Sleuth'];
 const ICON_NAMES = ['Ghost', 'Skull', 'Bird', 'Bot', 'Zap', 'Flame', 'Star', 'Moon', 'Sun', 'Cloud', 'Snowflake', 'Droplet', 'Wind', 'Coffee', 'Rocket', 'Crown', 'Eye', 'Shield', 'Key'];
 const ICON_MAP: Record<string, any> = { Ghost, Skull, Bird, Bot, Zap, Flame, Star, Moon, Sun, Cloud, Snowflake, Droplet, Wind, Coffee, Rocket, Crown, Eye, Shield, Key };
 
+// Initialize socket outside component to prevent multiple connections
+const socket = io();
+
 export default function App() {
-  const [globalScore, setGlobalScore] = useState(10); // Start at 10 for testing
+  const [globalScore, setGlobalScore] = useState(10);
   const [streak, setStreak] = useState(0);
   const [lastVisit, setLastVisit] = useState<string | null>(null);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
@@ -38,6 +42,17 @@ export default function App() {
   const [userIconName, setUserIconName] = useState<string>('Ghost');
 
   useEffect(() => {
+    // Socket.IO listeners
+    socket.on('score_update', (newScore: number) => {
+      setGlobalScore(newScore);
+    });
+
+    return () => {
+      socket.off('score_update');
+    };
+  }, []);
+
+  useEffect(() => {
     // Load theme
     const storedTheme = localStorage.getItem('siddhant_theme');
     if (storedTheme === 'light') {
@@ -46,18 +61,6 @@ export default function App() {
     } else {
       setIsDarkMode(true);
       document.documentElement.classList.add('dark');
-    }
-    // Load state from local storage
-    const storedScore = localStorage.getItem('siddhant_global_score');
-    if (storedScore) {
-      const parsedScore = parseFloat(storedScore);
-      // Reset to 10 if it exceeds 824 (useful for testing phase)
-      if (parsedScore > 824) {
-        setGlobalScore(10);
-        localStorage.setItem('siddhant_global_score', '10');
-      } else {
-        setGlobalScore(parsedScore);
-      }
     }
 
     const storedStreak = localStorage.getItem('siddhant_streak');
@@ -129,9 +132,8 @@ export default function App() {
 
   const handlePointsAnimationComplete = () => {
     if (floatingPoints !== null) {
-      const newScore = Math.min(globalScore + floatingPoints, 824);
-      setGlobalScore(newScore);
-      localStorage.setItem('siddhant_global_score', newScore.toString());
+      // Emit to server instead of local state
+      socket.emit('add_score', floatingPoints);
       setFloatingPoints(null);
       
       // Trigger meter pulse effect
