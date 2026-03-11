@@ -15,7 +15,7 @@ export function StatCard({ title, value, suffix, icon, delay = 0 }: StatCardProp
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className="p-5 bg-white/60 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl flex flex-col items-center justify-center text-center backdrop-blur-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/60 transition-colors shadow-sm dark:shadow-none"
+      className="h-full p-5 bg-white/60 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-2xl flex flex-col items-center justify-center text-center backdrop-blur-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/60 transition-colors shadow-sm dark:shadow-none"
     >
       <div className="mb-3 p-2 bg-zinc-100 dark:bg-zinc-800/50 rounded-full transition-colors">{icon}</div>
       <div className="flex items-baseline gap-1">

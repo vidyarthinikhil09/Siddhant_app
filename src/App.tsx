@@ -13,10 +13,14 @@ import { FloatingPoints } from './components/FloatingPoints';
 import { AmbientBackground } from './components/AmbientBackground';
 import { NormalGalleryModal } from './components/NormalGalleryModal';
 import { MemeGalleryModal } from './components/MemeGalleryModal';
-import { SiddhantSticker } from './components/SiddhantSticker';
-import { Ghost, Sparkles, ChevronRight, Flame, Target, Moon, Sun, Info, Image as ImageIcon, ImagePlus, ExternalLink, Skull, Bird, Bot, Zap, Star, Cloud, Snowflake, Droplet, Wind, Coffee, Rocket, Crown, Eye, Shield, Key } from 'lucide-react';
+import { LeaderboardModal } from './components/LeaderboardModal';
+import { BadgesModal } from './components/BadgesModal';
+import { BadgeCelebrationModal } from './components/BadgeCelebrationModal';
+import { BADGE_MAP } from './constants/badges';
+import { Ghost, Sparkles, ChevronRight, Flame, Target, Moon, Sun, Info, Image as ImageIcon, ImagePlus, ExternalLink, Skull, Bird, Bot, Zap, Star, Cloud, Snowflake, Droplet, Wind, Coffee, Rocket, Crown, Eye, Shield, Key, Trophy, Medal, Award } from 'lucide-react';
 import { audio } from './utils/audio';
 import { io } from 'socket.io-client';
+import fpPromise from '@fingerprintjs/fingerprintjs';
 
 const ADJECTIVES = ['Based', 'Sigma', 'Chill', 'Secret', 'Hidden', 'Elite', 'Dank', 'Cursed', 'Blessed', 'Rogue', 'Loyal', 'Goofy', 'Chad', 'Mysterious', 'Silent', 'Anon'];
 const NOUNS = ['Investigator', 'Watcher', 'Follower', 'Friend', 'Bro', 'Detective', 'Observer', 'Fan', 'Stan', 'Believer', 'Witness', 'Agent', 'Scholar', 'Poster', 'Lurker', 'Sleuth'];
@@ -32,6 +36,9 @@ export default function App() {
   const [lastVisit, setLastVisit] = useState<string | null>(null);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isBadgesOpen, setIsBadgesOpen] = useState(false);
+  const [celebrationBadge, setCelebrationBadge] = useState<string | null>(null);
   const [isNormalGalleryOpen, setIsNormalGalleryOpen] = useState(false);
   const [isMemeGalleryOpen, setIsMemeGalleryOpen] = useState(false);
   const [quizCompleted, setQuizCompleted] = useState(false);
@@ -41,15 +48,58 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [userName, setUserName] = useState<string>('');
   const [userIconName, setUserIconName] = useState<string>('Ghost');
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [badges, setBadges] = useState<string[]>([]);
 
   useEffect(() => {
+    const initFp = async () => {
+      const fp = await fpPromise.load();
+      const result = await fp.get();
+      setDeviceId(result.visitorId);
+    };
+    initFp();
+
     // Socket.IO listeners
     socket.on('score_update', (newScore: number) => {
       setGlobalScore(newScore);
     });
 
+    socket.on('points_awarded', (points: number) => {
+      triggerPointsAnimation(points);
+    });
+
+    socket.on('device_status', (status: { quizCompleted: boolean, quizScore: number | null }) => {
+      if (status.quizCompleted) {
+        setQuizCompleted(true);
+        if (status.quizScore !== null) {
+          setPersonalScore(status.quizScore);
+          localStorage.setItem('siddhant_quiz_completed', 'true');
+          localStorage.setItem('siddhant_personal_score', status.quizScore.toString());
+        }
+      }
+    });
+
+    socket.on('profile_update', (profile: { streak: number, badges: string[] }) => {
+      setStreak(profile.streak);
+      setBadges(profile.badges);
+      localStorage.setItem('siddhant_streak', profile.streak.toString());
+      localStorage.setItem('siddhant_badges', JSON.stringify(profile.badges));
+    });
+
+    socket.on('badges_earned', (earnedBadges: string[]) => {
+      if (earnedBadges && earnedBadges.length > 0) {
+        // Show the highest badge earned if multiple
+        setCelebrationBadge(earnedBadges[earnedBadges.length - 1]);
+        audio.playReward();
+      }
+    });
+
     return () => {
       socket.off('score_update');
+      socket.off('points_awarded');
+      socket.off('device_status');
+      socket.off('profile_update');
+      socket.off('badges_earned');
     };
   }, []);
 
@@ -67,6 +117,13 @@ export default function App() {
     const storedStreak = localStorage.getItem('siddhant_streak');
     if (storedStreak) setStreak(parseInt(storedStreak, 10));
 
+    const storedBadges = localStorage.getItem('siddhant_badges');
+    if (storedBadges) {
+      try {
+        setBadges(JSON.parse(storedBadges));
+      } catch (e) {}
+    }
+
     const storedLastVisit = localStorage.getItem('siddhant_last_visit');
     const today = new Date().toISOString().split('T')[0];
 
@@ -83,16 +140,12 @@ export default function App() {
         setLastVisit(today);
         localStorage.setItem('siddhant_streak', newStreak.toString());
         localStorage.setItem('siddhant_last_visit', today);
-        
-        // Add 5 bonus points
-        triggerPointsAnimation(5);
       } else if (diffDays > 1) {
         // Streak broken
         setStreak(1);
         setLastVisit(today);
         localStorage.setItem('siddhant_streak', '1');
         localStorage.setItem('siddhant_last_visit', today);
-        triggerPointsAnimation(5);
       }
     } else {
       // First visit
@@ -100,7 +153,6 @@ export default function App() {
       setLastVisit(today);
       localStorage.setItem('siddhant_streak', '1');
       localStorage.setItem('siddhant_last_visit', today);
-      triggerPointsAnimation(5);
     }
 
     const storedQuiz = localStorage.getItem('siddhant_quiz_completed');
@@ -126,6 +178,13 @@ export default function App() {
     setUserIconName(storedIcon);
   }, []);
 
+  useEffect(() => {
+    if (deviceId) {
+      socket.emit('check_device', deviceId);
+      socket.emit('claim_daily', { deviceId, userName, userIcon: userIconName });
+    }
+  }, [deviceId, userName, userIconName]);
+
   const triggerPointsAnimation = (points: number) => {
     setFloatingPoints(points);
     // The actual score update happens after animation completes
@@ -133,12 +192,10 @@ export default function App() {
 
   const handlePointsAnimationComplete = () => {
     if (floatingPoints !== null) {
-      // Emit to server instead of local state
-      socket.emit('add_score', floatingPoints);
       setFloatingPoints(null);
       
       // Trigger meter pulse effect
-      audio.playTick();
+      audio.playReward();
       setMeterPulse(true);
       setTimeout(() => setMeterPulse(false), 500);
     }
@@ -151,13 +208,9 @@ export default function App() {
     localStorage.setItem('siddhant_quiz_completed', 'true');
     localStorage.setItem('siddhant_personal_score', score.toString());
 
-    // Scale down score (e.g., divide by 5)
-    const scaledPoints = Math.max(1, Math.round(score / 5));
-    
-    // Slight delay before showing animation
-    setTimeout(() => {
-      triggerPointsAnimation(scaledPoints);
-    }, 500);
+    if (deviceId) {
+      socket.emit('claim_quiz', { deviceId, score });
+    }
   };
 
   const toggleTheme = () => {
@@ -191,13 +244,30 @@ export default function App() {
         </div>
       )}
 
-      {/* Theme Toggle */}
-      <button
-        onClick={toggleTheme}
-        className="absolute top-4 right-4 p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors z-50"
-      >
-        {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-      </button>
+      {/* Top Right Controls */}
+      <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+        <button
+          onClick={() => setIsBadgesOpen(true)}
+          className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+          aria-label="Badges"
+        >
+          <Award className="w-5 h-5" />
+        </button>
+        <button
+          onClick={() => setIsLeaderboardOpen(true)}
+          className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+          aria-label="Leaderboard"
+        >
+          <Trophy className="w-5 h-5" />
+        </button>
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+          aria-label="Toggle Theme"
+        >
+          {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
+      </div>
 
       <AmbientBackground />
 
@@ -222,7 +292,7 @@ export default function App() {
             </button>
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 font-mono text-sm max-w-[280px] mx-auto transition-colors">
-            The truth is out there. Contribute to the meter to force the reveal.
+            Lets see how much u hate him. Contribute daily to be a consistent hater.
           </p>
         </motion.div>
 
@@ -230,29 +300,50 @@ export default function App() {
           <GlobalMeter score={globalScore} maxScore={824} pulse={meterPulse} />
           
           <div className="grid grid-cols-2 gap-4 w-full">
-            <StatCard 
-              title="Daily Streak" 
-              value={streak} 
-              suffix="days" 
-              icon={<Flame className="w-5 h-5 text-orange-400" />} 
-            />
-            {!canTakeQuiz ? (
+            <div className="flex flex-col gap-2">
               <StatCard 
-                title="Your Score" 
-                value={personalScore!} 
-                suffix="%" 
-                icon={<Target className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />} 
-                delay={0.1}
+                title="Daily Streak" 
+                value={streak} 
+                suffix="days" 
+                icon={<Flame className="w-5 h-5 text-orange-400" />} 
               />
-            ) : (
-              <div className="p-5 bg-zinc-100 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-800/50 border-dashed rounded-2xl flex flex-col items-center justify-center text-center transition-colors">
-                <div className="mb-3 p-2 bg-zinc-200 dark:bg-zinc-800/30 rounded-full transition-colors">
-                  <Target className="w-5 h-5 text-zinc-500 dark:text-zinc-600" />
+              {badges.length > 0 && (
+                <button 
+                  onClick={() => setIsBadgesOpen(true)}
+                  className="flex flex-wrap gap-1 justify-center p-2 bg-white/60 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/80 rounded-xl backdrop-blur-sm hover:bg-white dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  {badges.map(badgeId => {
+                    const badge = BADGE_MAP[badgeId];
+                    if (!badge) return null;
+                    const BadgeIcon = badge.icon;
+                    return (
+                      <div key={badgeId} className="p-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg shadow-sm" title={badge.label}>
+                        <BadgeIcon className={`w-4 h-4 ${badge.color}`} />
+                      </div>
+                    );
+                  })}
+                </button>
+              )}
+            </div>
+            <div className="flex flex-col h-full">
+              {!canTakeQuiz ? (
+                <StatCard 
+                  title="Your Score" 
+                  value={personalScore!} 
+                  suffix="%" 
+                  icon={<Target className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />} 
+                  delay={0.1}
+                />
+              ) : (
+                <div className="h-full p-5 bg-zinc-100 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-800/50 border-dashed rounded-2xl flex flex-col items-center justify-center text-center transition-colors">
+                  <div className="mb-3 p-2 bg-zinc-200 dark:bg-zinc-800/30 rounded-full transition-colors">
+                    <Target className="w-5 h-5 text-zinc-500 dark:text-zinc-600" />
+                  </div>
+                  <span className="text-xs font-medium text-zinc-600 dark:text-zinc-500 uppercase tracking-wider">Score Hidden</span>
+                  <span className="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">Take quiz to reveal</span>
                 </div>
-                <span className="text-xs font-medium text-zinc-600 dark:text-zinc-500 uppercase tracking-wider">Score Hidden</span>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-600 mt-1">Take quiz to reveal</span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <AnimatePresence mode="wait">
@@ -358,6 +449,23 @@ export default function App() {
         onClose={() => setIsInfoOpen(false)} 
       />
 
+      <LeaderboardModal
+        isOpen={isLeaderboardOpen}
+        onClose={() => setIsLeaderboardOpen(false)}
+      />
+
+      <BadgesModal
+        isOpen={isBadgesOpen}
+        onClose={() => setIsBadgesOpen(false)}
+        currentStreak={streak}
+      />
+
+      <BadgeCelebrationModal
+        isOpen={!!celebrationBadge}
+        onClose={() => setCelebrationBadge(null)}
+        badgeId={celebrationBadge}
+      />
+
       <NormalGalleryModal
         isOpen={isNormalGalleryOpen}
         onClose={() => setIsNormalGalleryOpen(false)}
@@ -372,8 +480,6 @@ export default function App() {
         points={floatingPoints} 
         onComplete={handlePointsAnimationComplete} 
       />
-
-      <SiddhantSticker />
     </div>
   );
 }

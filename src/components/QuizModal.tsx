@@ -87,7 +87,12 @@ export function QuizModal({ isOpen, onClose, onSubmit }: QuizModalProps) {
   }, [isOpen]);
 
   const handleSelect = (index: number) => {
-    audio.playTick();
+    if (index === QUESTIONS[currentQuestion].correct) {
+      audio.playSuccess();
+    } else {
+      audio.playFailure();
+    }
+    
     const newAnswers = [...answers, index];
     setAnswers(newAnswers);
 
@@ -103,7 +108,7 @@ export function QuizModal({ isOpen, onClose, onSubmit }: QuizModalProps) {
       setShowResult(true);
       
       audio.stopDrone();
-      audio.playSuccess();
+      audio.playReward();
       
       // Delay closing to show result
       setTimeout(() => {
