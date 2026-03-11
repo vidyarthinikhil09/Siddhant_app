@@ -70,17 +70,25 @@ try {
 
 // Migration for points_history
 try {
+  db.exec('ALTER TABLE points_history ADD COLUMN type TEXT DEFAULT "streak"');
+} catch (e) {}
+
+try {
   const countRes = db.prepare('SELECT COUNT(*) as count FROM points_history').get() as any;
-  if (countRes.count === 0) {
+  const hasQuizType = db.prepare('SELECT COUNT(*) as count FROM points_history WHERE type = "quiz"').get() as any;
+  
+  if (countRes.count === 0 || hasQuizType.count === 0) {
+    // Rebuild points_history to ensure quiz scores are fully counted
+    db.exec('DELETE FROM points_history');
     const users = db.prepare('SELECT * FROM device_tracking').all() as any[];
-    const insertPt = db.prepare('INSERT INTO points_history (device_id, points, created_at) VALUES (?, ?, ?)');
+    const insertPt = db.prepare('INSERT INTO points_history (device_id, points, type, created_at) VALUES (?, ?, ?, ?)');
     const now = new Date().toISOString();
     db.transaction(() => {
       for (const u of users) {
-        if (u.streak > 0) insertPt.run(u.device_id, u.streak, now);
+        if (u.streak > 0) insertPt.run(u.device_id, u.streak, 'streak', now);
         if (u.quiz_completed === 1 && u.quiz_score !== null) {
-          const pts = Math.max(1, Math.round(u.quiz_score / 50));
-          insertPt.run(u.device_id, pts, now);
+          // Award actual quiz score points
+          insertPt.run(u.device_id, u.quiz_score, 'quiz', now);
         }
       }
     })();
@@ -144,7 +152,7 @@ async function startServer() {
           INSERT INTO device_tracking (device_id, last_daily_claim, user_name, user_icon, streak, badges) 
           VALUES (?, ?, ?, ?, ?, ?)
         `).run(deviceId, today, userName, userIcon, currentStreak, JSON.stringify([]));
-        db.prepare('INSERT INTO points_history (device_id, points) VALUES (?, 1)').run(deviceId);
+        db.prepare('INSERT INTO points_history (device_id, points, type) VALUES (?, 1, "streak")').run(deviceId);
         addGlobalScore(1);
         socket.emit('points_awarded', 1);
       } else {
@@ -184,7 +192,7 @@ async function startServer() {
           db.prepare('UPDATE device_tracking SET last_daily_claim = ?, streak = ?, badges = ? WHERE device_id = ?')
             .run(today, currentStreak, JSON.stringify(newBadges), deviceId);
             
-          db.prepare('INSERT INTO points_history (device_id, points) VALUES (?, 1)').run(deviceId);
+          db.prepare('INSERT INTO points_history (device_id, points, type) VALUES (?, 1, "streak")').run(deviceId);
           addGlobalScore(1);
           socket.emit('points_awarded', 1);
           
@@ -207,17 +215,17 @@ async function startServer() {
     socket.on('claim_quiz', ({ deviceId, score }) => {
       if (!deviceId) return;
       const record = db.prepare('SELECT * FROM device_tracking WHERE device_id = ?').get(deviceId) as any;
-      // Max 2 points for a perfect score of 100
-      const pts = Math.max(1, Math.round(score / 50));
+      // Award actual quiz score points
+      const pts = score;
       
       if (!record) {
         db.prepare('INSERT INTO device_tracking (device_id, quiz_completed, quiz_score) VALUES (?, 1, ?)').run(deviceId, score);
-        db.prepare('INSERT INTO points_history (device_id, points) VALUES (?, ?)').run(deviceId, pts);
+        db.prepare('INSERT INTO points_history (device_id, points, type) VALUES (?, ?, "quiz")').run(deviceId, pts);
         addGlobalScore(pts);
         socket.emit('points_awarded', pts);
       } else if (!record.quiz_completed) {
         db.prepare('UPDATE device_tracking SET quiz_completed = 1, quiz_score = ? WHERE device_id = ?').run(score, deviceId);
-        db.prepare('INSERT INTO points_history (device_id, points) VALUES (?, ?)').run(deviceId, pts);
+        db.prepare('INSERT INTO points_history (device_id, points, type) VALUES (?, ?, "quiz")').run(deviceId, pts);
         addGlobalScore(pts);
         socket.emit('points_awarded', pts);
       }

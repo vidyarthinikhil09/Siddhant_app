@@ -19,6 +19,10 @@ export function BadgeCelebrationModal({ isOpen, onClose, badgeId }: BadgeCelebra
       const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
 
       const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+      const randomColor = () => {
+        const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#ffffff'];
+        return colors[Math.floor(Math.random() * colors.length)];
+      };
 
       const interval: any = setInterval(function() {
         const timeLeft = animationEnd - Date.now();
@@ -29,11 +33,17 @@ export function BadgeCelebrationModal({ isOpen, onClose, badgeId }: BadgeCelebra
 
         const particleCount = 50 * (timeLeft / duration);
         confetti({
-          ...defaults, particleCount,
+          ...defaults, 
+          particleCount,
+          scalar: randomInRange(0.8, 1.4),
+          colors: [randomColor(), randomColor(), randomColor()],
           origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
         });
         confetti({
-          ...defaults, particleCount,
+          ...defaults, 
+          particleCount,
+          scalar: randomInRange(0.8, 1.4),
+          colors: [randomColor(), randomColor(), randomColor()],
           origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
         });
       }, 250);
@@ -78,9 +88,13 @@ export function BadgeCelebrationModal({ isOpen, onClose, badgeId }: BadgeCelebra
             className="relative mx-auto w-32 h-32 mb-6"
           >
             <div className={`absolute inset-0 bg-gradient-to-br ${badge.gradient} opacity-20 rounded-full animate-ping`} style={{ animationDuration: '3s' }} />
-            <div className={`absolute inset-2 bg-gradient-to-br ${badge.gradient} rounded-full flex items-center justify-center border-4 border-white dark:border-zinc-900 shadow-xl shadow-${badge.color.split('-')[1]}-500/50`}>
+            <motion.div 
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+              className={`absolute inset-2 bg-gradient-to-br ${badge.gradient} rounded-full flex items-center justify-center border-4 border-white dark:border-zinc-900 shadow-xl shadow-${badge.color.split('-')[1]}-500/50`}
+            >
               <Icon className="w-16 h-16 text-white drop-shadow-md" />
-            </div>
+            </motion.div>
             
             {/* Sparkles around the badge */}
             <motion.div
