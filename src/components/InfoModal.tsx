@@ -46,10 +46,10 @@ export function InfoModal({ isOpen, onClose }: InfoModalProps) {
                 Room 824 isn't just a room number—it's a lifestyle. It's the legendary sanctuary where Siddhant's bed exerts a gravitational pull stronger than a black hole.
               </p>
               <p>
-                We set the goal to exactly <strong className="text-emerald-600 dark:text-emerald-400">824 points</strong> to honor this sacred space. Every quiz taken and every daily streak brings us closer to the truth.
+                We set the goal to exactly <strong className="text-emerald-600 dark:text-emerald-400">2000 points</strong> to honor this sacred space. Every quiz taken and every daily streak brings us closer to the truth.
               </p>
               <p>
-                Once the global meter hits 824, we will finally reveal to Siddhant that this anonymous Instagram account exists—assuming he hasn't found out by then.
+                Once the global meter hits 2000, we will finally reveal to Siddhant that this anonymous Instagram account exists—assuming he hasn't found out by then.
               </p>
             </div>
 

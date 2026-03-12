@@ -147,7 +147,7 @@ export function MemeGalleryModal({ isOpen, onClose }: MemeGalleryModalProps) {
     if (!isAdmin) {
       try {
         const pwd = window.prompt('Developer Admin Password:');
-        if (pwd === '824') {
+        if (pwd === '2000') {
           setIsAdmin(true);
         }
       } catch (e) {

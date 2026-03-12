@@ -119,7 +119,7 @@ async function startServer() {
 
   const getGlobalScore = () => {
     const res = db.prepare('SELECT SUM(points) as total FROM points_history').get() as any;
-    return Math.min(20 + (res.total || 0), 824);
+    return Math.min(20 + (res.total || 0), 2000);
   };
 
   const addGlobalScore = (points: number) => {

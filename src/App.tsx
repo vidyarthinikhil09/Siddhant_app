@@ -311,7 +311,7 @@ export default function App() {
         </motion.div>
 
         <div className="w-full space-y-6">
-          <GlobalMeter score={globalScore} maxScore={824} pulse={meterPulse} />
+          <GlobalMeter score={globalScore} maxScore={2000} pulse={meterPulse} />
           
           <div className="grid grid-cols-2 gap-4 w-full">
             <div className="flex flex-col gap-2">

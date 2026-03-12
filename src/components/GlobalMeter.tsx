@@ -44,7 +44,7 @@ export function GlobalMeter({ score, maxScore, pulse = false }: GlobalMeterProps
       </div>
 
       <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-500 font-mono text-center">
-        If the meter hits 824, we will reveal to Siddhant that his Instagram account exists (if he hasn't found out by then).
+        If the meter hits 2000, we will reveal to Siddhant that his Instagram account exists (if he hasn't found out by then).
       </p>
     </motion.div>
   );
