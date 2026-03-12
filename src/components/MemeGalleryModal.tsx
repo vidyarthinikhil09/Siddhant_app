@@ -164,12 +164,14 @@ export function MemeGalleryModal({ isOpen, onClose }: MemeGalleryModalProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/80 dark:bg-black/80 backdrop-blur-sm"
       >
         <motion.div
-          initial={{ scale: 0.95, y: 20 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.95, y: 20 }}
+          initial={{ scale: 0.95, y: 20, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.95, y: 20, opacity: 0 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
           className="w-full max-w-2xl max-h-[80vh] flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl overflow-hidden relative shadow-2xl transition-colors"
         >
           <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between shrink-0">

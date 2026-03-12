@@ -65,27 +65,32 @@ try {
   db.exec('ALTER TABLE device_tracking ADD COLUMN streak INTEGER DEFAULT 0');
 } catch (e) {}
 try {
-  db.exec('ALTER TABLE device_tracking ADD COLUMN badges TEXT DEFAULT "[]"');
+  db.exec("ALTER TABLE device_tracking ADD COLUMN badges TEXT DEFAULT '[]'");
 } catch (e) {}
 
 // Migration for points_history
 try {
-  db.exec('ALTER TABLE points_history ADD COLUMN type TEXT DEFAULT "streak"');
+  db.exec("ALTER TABLE points_history ADD COLUMN type TEXT DEFAULT 'streak'");
 } catch (e) {}
 
 try {
   const countRes = db.prepare('SELECT COUNT(*) as count FROM points_history').get() as any;
-  const hasQuizType = db.prepare('SELECT COUNT(*) as count FROM points_history WHERE type = "quiz"').get() as any;
+  const hasQuizType = db.prepare("SELECT COUNT(*) as count FROM points_history WHERE type = 'quiz'").get() as any;
+  const hasOldStreak = db.prepare("SELECT COUNT(*) as count FROM points_history WHERE type = 'streak' AND points != 4").get() as any;
   
-  if (countRes.count === 0 || hasQuizType.count === 0) {
-    // Rebuild points_history to ensure quiz scores are fully counted
+  if (countRes.count === 0 || hasQuizType.count === 0 || hasOldStreak.count > 0) {
+    // Rebuild points_history to ensure quiz scores are fully counted and streak points are exactly 4 per day
     db.exec('DELETE FROM points_history');
     const users = db.prepare('SELECT * FROM device_tracking').all() as any[];
     const insertPt = db.prepare('INSERT INTO points_history (device_id, points, type, created_at) VALUES (?, ?, ?, ?)');
     const now = new Date().toISOString();
     db.transaction(() => {
       for (const u of users) {
-        if (u.streak > 0) insertPt.run(u.device_id, u.streak, 'streak', now);
+        if (u.streak > 0) {
+          for (let i = 0; i < u.streak; i++) {
+            insertPt.run(u.device_id, 4, 'streak', now);
+          }
+        }
         if (u.quiz_completed === 1 && u.quiz_score !== null) {
           // Award actual quiz score points
           insertPt.run(u.device_id, u.quiz_score, 'quiz', now);
@@ -98,7 +103,7 @@ try {
 }
 
 // Reset the score to 28 as requested
-db.prepare('UPDATE global_state SET score = 28 WHERE id = 1').run();
+// db.prepare('UPDATE global_state SET score = 28 WHERE id = 1').run();
 
 async function startServer() {
   const app = express();
@@ -112,16 +117,19 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+  const getGlobalScore = () => {
+    const res = db.prepare('SELECT SUM(points) as total FROM points_history').get() as any;
+    return Math.min(20 + (res.total || 0), 824);
+  };
+
   const addGlobalScore = (points: number) => {
-    db.prepare('UPDATE global_state SET score = MIN(score + ?, 824) WHERE id = 1').run(points);
-    const newState = db.prepare('SELECT score FROM global_state WHERE id = 1').get() as any;
-    io.emit('score_update', newState.score);
+    const score = getGlobalScore();
+    io.emit('score_update', score);
   };
 
   io.on('connection', (socket) => {
     // Send current score on connection
-    const state = db.prepare('SELECT score FROM global_state WHERE id = 1').get() as any;
-    socket.emit('score_update', state.score);
+    socket.emit('score_update', getGlobalScore());
 
     socket.on('check_device', (deviceId) => {
       if (!deviceId) return;
@@ -152,9 +160,9 @@ async function startServer() {
           INSERT INTO device_tracking (device_id, last_daily_claim, user_name, user_icon, streak, badges) 
           VALUES (?, ?, ?, ?, ?, ?)
         `).run(deviceId, today, userName, userIcon, currentStreak, JSON.stringify([]));
-        db.prepare('INSERT INTO points_history (device_id, points, type) VALUES (?, 1, "streak")').run(deviceId);
-        addGlobalScore(1);
-        socket.emit('points_awarded', 1);
+        db.prepare("INSERT INTO points_history (device_id, points, type) VALUES (?, ?, 'streak')").run(deviceId, 4);
+        addGlobalScore(4);
+        socket.emit('points_awarded', 4);
       } else {
         // Update name and icon if provided
         if (userName && userIcon) {
@@ -192,9 +200,9 @@ async function startServer() {
           db.prepare('UPDATE device_tracking SET last_daily_claim = ?, streak = ?, badges = ? WHERE device_id = ?')
             .run(today, currentStreak, JSON.stringify(newBadges), deviceId);
             
-          db.prepare('INSERT INTO points_history (device_id, points, type) VALUES (?, 1, "streak")').run(deviceId);
-          addGlobalScore(1);
-          socket.emit('points_awarded', 1);
+          db.prepare("INSERT INTO points_history (device_id, points, type) VALUES (?, ?, 'streak')").run(deviceId, 4);
+          addGlobalScore(4);
+          socket.emit('points_awarded', 4);
           
           if (newlyEarnedBadges.length > 0) {
             socket.emit('badges_earned', newlyEarnedBadges);
@@ -220,12 +228,12 @@ async function startServer() {
       
       if (!record) {
         db.prepare('INSERT INTO device_tracking (device_id, quiz_completed, quiz_score) VALUES (?, 1, ?)').run(deviceId, score);
-        db.prepare('INSERT INTO points_history (device_id, points, type) VALUES (?, ?, "quiz")').run(deviceId, pts);
+        db.prepare("INSERT INTO points_history (device_id, points, type) VALUES (?, ?, 'quiz')").run(deviceId, pts);
         addGlobalScore(pts);
         socket.emit('points_awarded', pts);
       } else if (!record.quiz_completed) {
         db.prepare('UPDATE device_tracking SET quiz_completed = 1, quiz_score = ? WHERE device_id = ?').run(score, deviceId);
-        db.prepare('INSERT INTO points_history (device_id, points, type) VALUES (?, ?, "quiz")').run(deviceId, pts);
+        db.prepare("INSERT INTO points_history (device_id, points, type) VALUES (?, ?, 'quiz')").run(deviceId, pts);
         addGlobalScore(pts);
         socket.emit('points_awarded', pts);
       }

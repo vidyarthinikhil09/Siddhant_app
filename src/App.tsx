@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GlobalMeter } from './components/GlobalMeter';
 import { StatCard } from './components/StatCard';
@@ -190,7 +190,7 @@ export default function App() {
     // The actual score update happens after animation completes
   };
 
-  const handlePointsAnimationComplete = () => {
+  const handlePointsAnimationComplete = useCallback(() => {
     if (floatingPoints !== null) {
       setFloatingPoints(null);
       
@@ -199,7 +199,7 @@ export default function App() {
       setMeterPulse(true);
       setTimeout(() => setMeterPulse(false), 500);
     }
-  };
+  }, [floatingPoints]);
 
   const handleQuizSubmit = (score: number) => {
     setPersonalScore(score);
@@ -234,35 +234,49 @@ export default function App() {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans relative overflow-hidden selection:bg-emerald-500/30 transition-colors duration-300">
       <div className="scanlines" />
       
-      {/* User Greeting */}
-      {userName && (
-        <div className="absolute top-4 left-4 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-200/50 dark:bg-zinc-800/50 border border-zinc-300/50 dark:border-zinc-700/50 backdrop-blur-sm shadow-sm">
-          <UserIcon className="w-4 h-4 text-emerald-500" />
-          <span className="text-xs font-mono text-zinc-600 dark:text-zinc-300">
-            Hi, <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{userName}</span>
-          </span>
-        </div>
-      )}
+      {/* User Greeting & Streak */}
+      <div className="absolute top-4 left-4 z-50 flex flex-col gap-2">
+        {userName && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-200/50 dark:bg-zinc-800/50 border border-zinc-300/50 dark:border-zinc-700/50 backdrop-blur-sm shadow-sm transition-all hover:bg-zinc-200 dark:hover:bg-zinc-800">
+            <UserIcon className="w-4 h-4 text-emerald-500" />
+            <span className="text-xs font-mono text-zinc-600 dark:text-zinc-300">
+              Hi, <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{userName}</span>
+            </span>
+          </div>
+        )}
+        {streak > 0 && (
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 backdrop-blur-sm shadow-sm w-fit transition-all hover:bg-orange-500/20 cursor-default"
+          >
+            <Flame className="w-4 h-4 text-orange-500" />
+            <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
+              {streak} Day Streak
+            </span>
+          </motion.div>
+        )}
+      </div>
 
       {/* Top Right Controls */}
       <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
         <button
           onClick={() => setIsBadgesOpen(true)}
-          className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+          className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all hover:scale-105 active:scale-95"
           aria-label="Badges"
         >
           <Award className="w-5 h-5" />
         </button>
         <button
           onClick={() => setIsLeaderboardOpen(true)}
-          className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+          className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all hover:scale-105 active:scale-95"
           aria-label="Leaderboard"
         >
           <Trophy className="w-5 h-5" />
         </button>
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+          className="p-2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all hover:scale-105 active:scale-95"
           aria-label="Toggle Theme"
         >
           {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -285,7 +299,7 @@ export default function App() {
             Room 824
             <button 
               onClick={() => setIsInfoOpen(true)}
-              className="p-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800/50 text-zinc-400 hover:text-emerald-500 transition-colors"
+              className="p-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800/50 text-zinc-400 hover:text-emerald-500 transition-all hover:scale-105 active:scale-95"
               aria-label="About Room 824"
             >
               <Info className="w-5 h-5" />
@@ -357,7 +371,7 @@ export default function App() {
               >
                 <button
                   onClick={() => setIsQuizOpen(true)}
-                  className="w-full group relative overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 text-left transition-all hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 shadow-sm dark:shadow-none"
+                  className="w-full group relative overflow-hidden rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 text-left transition-all duration-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:-translate-y-1 hover:shadow-lg active:scale-95 shadow-sm dark:shadow-none"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 dark:from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="relative flex items-center justify-between">
@@ -386,7 +400,7 @@ export default function App() {
           >
             <button
               onClick={() => setIsNormalGalleryOpen(true)}
-              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all group shadow-sm dark:shadow-none"
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 group shadow-sm dark:shadow-none"
             >
               <div className="p-3 bg-zinc-100 dark:bg-zinc-800/50 rounded-full group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
                 <ImageIcon className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
@@ -396,7 +410,7 @@ export default function App() {
 
             <button
               onClick={() => setIsMemeGalleryOpen(true)}
-              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-emerald-500/50 transition-all group shadow-sm dark:shadow-none"
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-emerald-500/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 group shadow-sm dark:shadow-none"
             >
               <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-full group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/40 transition-colors">
                 <ImagePlus className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -416,7 +430,7 @@ export default function App() {
               href="https://docs.google.com/forms/d/e/1FAIpQLSe3Imlkf-PF21ceEWT5KdjDtfJYD0pdHpS3-RdpBure33Kc7w/viewform?usp=publish-editor"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full group relative overflow-hidden rounded-2xl bg-zinc-900 dark:bg-zinc-100 border border-zinc-800 dark:border-zinc-200 p-6 text-left transition-all hover:bg-zinc-800 dark:hover:bg-white shadow-md flex items-center justify-between"
+              className="w-full group relative overflow-hidden rounded-2xl bg-zinc-900 dark:bg-zinc-100 border border-zinc-800 dark:border-zinc-200 p-6 text-left transition-all duration-300 hover:bg-zinc-800 dark:hover:bg-white hover:-translate-y-1 hover:shadow-xl active:scale-95 shadow-md flex items-center justify-between"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 dark:from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="relative z-10">

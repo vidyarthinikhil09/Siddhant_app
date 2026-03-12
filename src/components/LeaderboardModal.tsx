@@ -83,12 +83,14 @@ export function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/80 dark:bg-black/80 backdrop-blur-sm"
       >
         <motion.div
-          initial={{ scale: 0.95, y: 20 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.95, y: 20 }}
+          initial={{ scale: 0.95, y: 20, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.95, y: 20, opacity: 0 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
           className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[80vh]"
         >
           <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex flex-col gap-4 bg-zinc-50 dark:bg-zinc-900/50">

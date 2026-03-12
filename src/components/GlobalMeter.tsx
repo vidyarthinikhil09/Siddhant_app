@@ -18,7 +18,7 @@ export function GlobalMeter({ score, maxScore, pulse = false }: GlobalMeterProps
         boxShadow: ['0 0 0px rgba(52,211,153,0)', '0 0 20px rgba(52,211,153,0.4)', '0 0 0px rgba(52,211,153,0)']
       } : {}}
       transition={{ duration: 0.5 }}
-      className="w-full max-w-md mx-auto p-6 bg-white/80 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl backdrop-blur-sm relative overflow-hidden transition-colors"
+      className="w-full max-w-md mx-auto p-6 bg-white/80 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl backdrop-blur-sm relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
     >
       <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
       
